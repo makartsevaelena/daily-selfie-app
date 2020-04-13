@@ -1,0 +1,13 @@
+out/
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+bin/
+.gradle/
+build/
+gen/
+release/
+local.properties
+*.log
