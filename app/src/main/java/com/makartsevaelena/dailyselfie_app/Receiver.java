@@ -25,7 +25,11 @@ public class Receiver extends BroadcastReceiver {
 
         Notification notification = builder.build();
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.notify(1, notification);
+        try {
+            notificationManager.notify(1, notification);
+        } catch (NullPointerException e) {
+            e.getStackTrace();
+        }
 
     }
 }

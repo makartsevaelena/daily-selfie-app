@@ -2,6 +2,7 @@ package com.makartsevaelena.dailyselfie_app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,6 +12,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 
@@ -36,8 +38,9 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerViewAdapte
     @Override
     public void onBindViewHolder(@NonNull final ViewHolder holder, final int position) {
         holder.selfie = selfies.get(position);
-        holder.imageView.setImageBitmap(holder.selfie.getSelfieBitmap());
-        holder.textView.setText(holder.selfie.getName());
+        File file = new File(holder.selfie.getPathSelfieFile());
+        holder.imageView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));
+        holder.textView.setText(file.getName());
         holder.mView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -67,10 +70,9 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerViewAdapte
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            mView=itemView;
+            mView = itemView;
             textView = itemView.findViewById(R.id.textView);
             imageView = itemView.findViewById(R.id.imageView);
         }
     }
-
 }

@@ -4,8 +4,6 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,10 +22,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_TAKE_IMAGE = 1;
@@ -36,8 +33,7 @@ public class MainActivity extends AppCompatActivity {
     private static final long INTERVAL_TWO_MINUTES = 2 * 60 * 1000L;
     private ArrayList<Selfie> selfiesList;
     private RecyclerViewAdapter recyclerViewAdapter;
-    private String pathSaveImageFile;
-
+    private String absolutePathCurrentFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,7 +46,6 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setAdapter(recyclerViewAdapter);
         scheduleRepeatingRTCNotification(this);
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -66,14 +61,32 @@ public class MainActivity extends AppCompatActivity {
             getImageFromCamera();
         }
         if (id == R.id.delete_all) {
-            for (Selfie selfie : selfiesList) {
-                File selfieFile = new File(selfie.getPathSelfieFile());
-                selfieFile.delete();
+            if (!getStorageDirlistFiles().isEmpty()) {
+                for (File file : getStorageDirlistFiles()) {
+                    file.delete();
+                }
             }
             selfiesList.clear();
             recyclerViewAdapter.notifyDataSetChanged();
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private ArrayList<File> getStorageDirlistFiles() {
+        File storageDir = this.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        ArrayList<File> storageDirlistFiles = new ArrayList<>();
+        if (storageDir != null) {
+            File[] listFiles = storageDir.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File file, String name) {
+                    return name.endsWith(".jpg");
+                }
+            });
+            if (listFiles != null) {
+                storageDirlistFiles.addAll(Arrays.asList(listFiles));
+            }
+        }
+        return storageDirlistFiles;
     }
 
     public static void scheduleRepeatingRTCNotification(Context context) {
@@ -89,34 +102,41 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     private void getImageFromCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        File file = null;
-        try {
-            file = createImageFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        Uri imageUri = null;
-        if (file != null) {
-            imageUri = FileProvider.getUriForFile(this, PROVIDER, file);
-            Log.d(TAG, "imageUri = " + imageUri);
-        } else {
-            Log.d(TAG, "imageUri = null ");
-        }
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+        Uri imageUri = FileProvider.getUriForFile(this, PROVIDER, getCurrentFile());
+        if (imageUri != null) {
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+        } else Log.d(TAG, "Uri = null");
         if (intent.resolveActivity(getPackageManager()) != null) {
             startActivityForResult(intent, REQUEST_TAKE_IMAGE);
         } else {
-            Log.d(TAG, "Intent is null");
+            Log.d(TAG, "Intent = null");
         }
 
     }
 
-    private File createImageFile() throws IOException {
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String imageFileName = "JPEG_" + timeStamp + "_";
+    private File getCurrentFile() {
+        String imageFileName = "SELFIE_";
+        File imageFile = null;
+        try {
+            imageFile = File.createTempFile(
+                    imageFileName,  /* prefix */
+                    ".jpg",         /* suffix */
+                    getStorageDir()      /* directory */
+            );
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (imageFile != null) {
+            absolutePathCurrentFile = imageFile.getAbsolutePath();
+        } else {
+            Log.d(TAG, "imageFile = null");
+        }
+        return imageFile;
+    }
+
+    private File getStorageDir() {
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         if (storageDir != null) {
             if (!storageDir.exists()) {
@@ -125,13 +145,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Directory is exists");
             }
         }
-        File imageFile = File.createTempFile(
-                imageFileName,  /* prefix */
-                ".jpg",         /* suffix */
-                storageDir      /* directory */
-        );
-        pathSaveImageFile = imageFile.getAbsolutePath();
-        return imageFile;
+        return storageDir;
     }
 
     @Override
@@ -139,13 +153,13 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_TAKE_IMAGE && resultCode == RESULT_OK) {
             if (data == null) {
-                Log.d(TAG, "Data is null");
+                Log.d(TAG, "onActivityResult data = null");
             } else {
-                Uri uri;
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                    uri = Uri.fromFile(new File(pathSaveImageFile));
+                Uri uri = null;
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.N) {
+                    uri = Uri.fromFile(new File(absolutePathCurrentFile));
                 } else {
-                    uri = FileProvider.getUriForFile(this, PROVIDER, new File(pathSaveImageFile));
+                    uri = FileProvider.getUriForFile(this, PROVIDER, new File(absolutePathCurrentFile));
                 }
                 Log.d(TAG, "Uri is " + uri);
 
@@ -159,22 +173,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         selfiesList.clear();
-        File storageDir = this.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        if (storageDir != null) {
-            File[] selfieFiles = storageDir.listFiles(new FilenameFilter() {
-                @Override
-                public boolean accept(File file, String name) {
-                    return name.endsWith(".jpg");
-                }
-            });
-
-            if (selfieFiles != null) {
-                for (File file : selfieFiles) {
-                    Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
-                    Selfie selfie = new Selfie(file.getAbsolutePath(), file.getName(), bitmap);
-                    selfiesList.add(selfie);
-                }
-            }
+        for (File file : getStorageDirlistFiles()) {
+            selfiesList.add(new Selfie(file.getAbsolutePath()));
         }
         recyclerViewAdapter.notifyDataSetChanged();
 
